@@ -128,7 +128,7 @@ struct LoginView: View {
             } message: {
                 Text(viewModel.errorMessage ?? "")
             }
-            .onChange(of: viewModel.isLoggedIn) { _, loggedIn in
+            .onChange(of: viewModel.isLoggedIn) { loggedIn in
                 if loggedIn { onLoginSuccess() }
             }
         }

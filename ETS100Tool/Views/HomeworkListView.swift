@@ -39,7 +39,7 @@ struct HomeworkListView: View {
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
                 .padding(.vertical, 8)
-                .onChange(of: viewModel.selectedStatus) { _, newStatus in
+                .onChange(of: viewModel.selectedStatus) { newStatus in
                     viewModel.switchStatus(to: newStatus)
                 }
 

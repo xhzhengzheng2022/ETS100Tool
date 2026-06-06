@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 答案展示管理
 /// 对照安卓 AnswerActivity.kt + formatPaperAsText
