@@ -1,4 +1,5 @@
 import Foundation
+import ZIPFoundation
 
 // MARK: - 结构类型枚举（对照安卓 StructureType）
 
@@ -357,19 +358,18 @@ enum ETS100AnswerReader {
     // MARK: - ZIP 解压辅助
 
     /// 从 ZIP 数据中提取 resourceDirName/content.json
-    /// 实际实现需要使用 ZIPFoundation 库，这里提供框架代码
+    /// 使用 ZIPFoundation 解压 AES-256 加密的 ZIP
     static func extractContentJSON(from zipData: Data, password: String) -> Data? {
-        // 使用 libcompression + minizip 或 ZIPFoundation
-        // 框架代码：实际运行时需替换为 ZIPFoundation API
-        // let archive = try Archive(data: zipData, accessMode: .read)
-        // guard let entry = archive["content.json"] else { return nil }
-        // var data = Data()
-        // _ = try archive.extract(entry) { data.append($0) }
-        // return data
-
-        // 由于当前环境无 ZIPFoundation，返回 nil
-        // 实际项目中应添加 SPM 依赖: https://github.com/weichsel/ZIPFoundation.git
-        return nil
+        do {
+            let archive = try Archive(data: zipData, accessMode: .read)
+            guard let entry = archive["content.json"] else { return nil }
+            var data = Data()
+            _ = try archive.extract(entry) { data.append($0) }
+            return data
+        } catch {
+            print("[ETS100AnswerReader] ZIP 解压失败: \(error)")
+            return nil
+        }
     }
 
     // MARK: - 辅助方法
