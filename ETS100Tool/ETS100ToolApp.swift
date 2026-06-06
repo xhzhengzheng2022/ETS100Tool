@@ -15,6 +15,7 @@ struct ETS100ToolApp: App {
 }
 
 /// 全局认证状态管理器（跨视图共享）
+@MainActor
 final class AuthStateManager: ObservableObject {
     @Published var isLoggedIn: Bool
 
