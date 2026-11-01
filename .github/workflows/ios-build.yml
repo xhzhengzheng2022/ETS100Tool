@@ -46,8 +46,12 @@ jobs:
           sudo xattr -dr com.apple.quarantine xtool.app || true
           echo "$PWD/xtool.app/Contents/MacOS" >> "$GITHUB_PATH"
 
+      - name: Show SDK status
+        run: xtool sdk status || true
+
       - name: Generate Xcode project
-        run: timeout 600 xtool dev generate-xcode-project
+        run: |
+          python3 -c "import subprocess,sys; sys.exit(subprocess.run(['xtool','dev','generate-xcode-project'], timeout=600).returncode)"
 
       - name: Build unsigned app
         run: |
