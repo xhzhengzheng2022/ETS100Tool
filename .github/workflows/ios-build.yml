@@ -2,6 +2,11 @@ name: iOS build
 
 on:
   workflow_dispatch:
+    inputs:
+      xtool_ipa:
+        description: "尝试用 xtool 生成工程并打包未签名 IPA（较慢，可能失败）"
+        type: boolean
+        default: false
   push:
     tags:
       - "v*"
@@ -30,9 +35,11 @@ jobs:
             build
 
   # 用 xtool 生成 Xcode 工程并产出未签名 .ipa。
-  # xtool 在没有 Darwin SDK / Apple 登录时会阻塞，因此限制执行时长。
+  # 注意：xtool 在无 Darwin SDK / 未登录 Apple 且无 TTY 的环境下可能长时间阻塞，
+  # 因此该任务默认不执行，仅在手动触发并勾选时运行。
   unsigned-ipa:
     name: xtool unsigned IPA
+    if: github.event_name == 'push' || inputs.xtool_ipa
     runs-on: macos-15
     timeout-minutes: 40
     steps:
@@ -46,12 +53,13 @@ jobs:
           sudo xattr -dr com.apple.quarantine xtool.app || true
           echo "$PWD/xtool.app/Contents/MacOS" >> "$GITHUB_PATH"
 
-      - name: Show SDK status
-        run: xtool sdk status || true
+      - name: Check xtool CLI
+        run: |
+          python3 -c "import subprocess,sys; sys.exit(subprocess.run(['xtool','--version'], timeout=120).returncode)"
 
       - name: Generate Xcode project
         run: |
-          python3 -c "import subprocess,sys; sys.exit(subprocess.run(['xtool','dev','generate-xcode-project'], timeout=600).returncode)"
+          python3 -c "import subprocess,sys; sys.exit(subprocess.run(['xtool','dev','generate-xcode-project'], timeout=900).returncode)"
 
       - name: Build unsigned app
         run: |
