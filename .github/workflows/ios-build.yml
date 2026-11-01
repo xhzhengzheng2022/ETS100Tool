@@ -1,4 +1,4 @@
-name: Build unsigned IPA
+name: iOS build
 
 on:
   workflow_dispatch:
@@ -7,9 +7,34 @@ on:
       - "v*"
 
 jobs:
-  ipa:
-    name: xtool + xcodebuild (unsigned)
+  # 用 Xcode 直接编译 SwiftPM 包，验证 iOS 目标可编译。
+  ios-compile:
+    name: iOS compile (xcodebuild)
     runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-path
+
+      - name: Build for iOS
+        run: |
+          xcodebuild \
+            -scheme ETS100Tool \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+  # 用 xtool 生成 Xcode 工程并产出未签名 .ipa。
+  # xtool 在没有 Darwin SDK / Apple 登录时会阻塞，因此限制执行时长。
+  unsigned-ipa:
+    name: xtool unsigned IPA
+    runs-on: macos-15
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -22,7 +47,7 @@ jobs:
           echo "$PWD/xtool.app/Contents/MacOS" >> "$GITHUB_PATH"
 
       - name: Generate Xcode project
-        run: xtool dev generate-xcode-project
+        run: timeout 600 xtool dev generate-xcode-project
 
       - name: Build unsigned app
         run: |
@@ -30,7 +55,7 @@ jobs:
             -project ETS100Tool.xcodeproj \
             -scheme ETS100Tool \
             -configuration Release \
-            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             build
