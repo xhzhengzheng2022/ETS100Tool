@@ -1,199 +1,163 @@
-# ETS 助手 iOS 版 (ETS100Tool)
+# ETS 助手 iOS 版 · ETS100Tool
 
-ETS100 云端答案提取工具 — iOS 移植版。从安卓版 Kotlin/Jetpack Compose 项目完整迁移而来，**仅保留云端模式**。
+ETS100 云端答案读取工具的 iOS 实现。以安卓版 Kotlin / Jetpack Compose 工程为蓝本重写，**仅保留云端模式**，使用开源工具 [xtool](https://github.com/xtool-org/xtool) 构建，无需 Xcode 图形界面。
 
-## 零 Mac 构建方案（GitHub Actions）
+> **免责声明**：本项目仅供学习、技术研究与个人自查使用。云端登录会顶掉 ETS100 官方客户端的登录状态；请勿用于考试作弊，使用产生的一切后果由使用者自行承担。
 
-无需拥有 Mac，推送代码到 GitHub 即可自动构建 .ipa。
+---
 
-### 使用步骤
+## 一、功能范围
 
-1. 在 GitHub 上创建仓库，把整个 `ETS100Tool-iOS` 文件夹推送上去
-2. 推送后 GitHub Actions 自动触发，macOS 环境编译，约 5~8 分钟
-3. 在仓库 Actions 页面下载 `ETS100Tool.ipa`（artifact，保留 7 天）
-4. 手动触发：Actions → Build iOS IPA → Run workflow
-
-### 签名说明
-
-GitHub Actions 产出的 .ipa **未签名**，无法直接在 iPhone 安装。你需要以下任一方式签名：
-
-| 签名方式 | 需要 | 成本 |
+| 能力 | 状态 | 说明 |
 |---|---|---|
-| 朋友 Mac + iOS App Signer | Mac + Apple ID | 免费 |
-| 云 Mac（MacinCloud 等） | 按小时租用 | ~$1/h |
-| 第三方签名服务 | 上传 .ipa | 约 ¥50-200/年 |
+| 手机号 + 密码登录 | ✅ | 复用安卓端的签名协议与固定设备参数 |
+| 设备绑定 / 短信验证码 | ✅ | `code=30014` 时自动绑定，必要时切换短信验证 |
+| 当前 / 历史 / 过期作业列表 | ✅ | `g/homework/list`，按状态分栏 |
+| 云端资源包下载与解密 | ✅ | CDN ZIP + 336 字节尾部密码种子 + ZipCrypto |
+| `content.json` 题目与答案解析 | ✅ | 支持 choose / fill / picture / read / role / dialogue / 3q5a 等 |
+| 解析结果本地缓存 | ✅ | Application Support 下的 `cloud_homework/` 与 `papers/` |
+| 答案复制 / 分享 | ✅ | 单题、整卷均可复制与系统分享 |
+| 本地读取（Root / Shizuku / 零宽字符） | ❌ | iOS 沙盒限制，无法实现 |
+| 词汇 PK 等在线作业 | ❌ | 在线题目协议未移植，列表会给出提示 |
+| 自动答题 / 自动提交 | ❌ | 本项目只读，不包含任何写操作 |
 
-签名后上传 fir.im 即可分发安装。
+---
 
-### 前置准备
-
-推送前先在 Xcode 中添加 ZIPFoundation SPM 依赖（否则 CI 构建会失败）：
-
-```
-File → Add Package Dependencies → https://github.com/weichsel/ZIPFoundation.git
-```
-
-如果暂时没有 Mac，可以先推送，根据 CI 报错再补依赖。
-
-## 技术栈
+## 二、技术栈
 
 | 层 | 方案 |
 |---|---|
-| 语言 | Swift 5.10+ |
-| UI | SwiftUI（声明式） |
-| 导航 | NavigationStack (iOS 16.0+) |
-| 网络 | URLSession + async/await |
-| JSON | Codable |
-| 存储 | Keychain + UserDefaults |
-| 最低版本 | **iOS 16.0** |
+| 语言 | Swift 6.2（SwiftPM，`swift-tools-version: 6.0`） |
+| UI | SwiftUI（iOS 17+） |
+| 网络 | `URLSession` + async/await |
+| JSON | 自研有序 `JSONValue`（保证签名逐字节一致） |
+| 压缩 | 自研 ZIP 中央目录解析 + ZipCrypto + 系统 zlib（`CZlib` C 目标） |
+| 存储 | Keychain（token / 密码）+ UserDefaults（手机号、机器码等） |
+| 构建 | xtool（`xtool.yml` + SwiftPM library product） |
 
-## 项目结构
+协议层 `ETS100Core` 不依赖 UIKit / SwiftUI，可在 Linux 上直接运行单元测试。
 
-```
-ETS100Tool-iOS/
-├── ETS100Tool.xcodeproj/
-│   └── project.pbxproj              # Xcode 项目配置
-├── ETS100Tool/
-│   ├── ETS100ToolApp.swift          # @main 入口
-│   ├── Info.plist                   # Bundle + ATS 配置
-│   ├── Models/                      # 数据模型 (Codable)
-│   │   ├── LoginResponse.swift
-│   │   ├── HomeworkItem.swift
-│   │   ├── HomeworkDetail.swift
-│   │   ├── QuestionGroup.swift
-│   │   ├── Question.swift
-│   │   ├── Answer.swift
-│   │   └── PaperInfo.swift
-│   ├── Services/                    # 业务服务
-│   │   ├── ETS100ApiClient.swift    # HTTP 客户端 (全部 API)
-│   │   ├── ETS100AuthManager.swift  # Token 管理 (Keychain)
-│   │   ├── ETS100AnswerReader.swift # 答案解析引擎
-│   │   └── ZipPasswordGenerator.swift # ZIP 密码生成
-│   ├── ViewModels/                  # MVVM ViewModel
-│   │   ├── LoginViewModel.swift
-│   │   ├── HomeworkListViewModel.swift
-│   │   ├── AnswerViewModel.swift
-│   │   └── SettingsViewModel.swift
-│   ├── Views/                       # SwiftUI 页面
-│   │   ├── LoginView.swift
-│   │   ├── HomeworkListView.swift
-│   │   ├── AnswerView.swift
-│   │   ├── SettingsView.swift
-│   │   └── MainTabView.swift
-│   └── Helpers/                     # 工具
-│       ├── Constants.swift
-│       └── MD5Helper.swift
-└── README.md
-```
+---
 
-## 功能对照（安卓 → iOS）
-
-| 安卓模块 | iOS 对应 | 状态 |
-|---|---|---|
-| ETS100ApiClient.kt | ETS100ApiClient.swift | 已迁移 |
-| ETS100AuthManager.kt | ETS100AuthManager.swift | 已迁移 |
-| ETS100AnswerReader.kt | ETS100AnswerReader.swift | 已迁移 |
-| ZipPasswordGenerator.kt | ZipPasswordGenerator.swift | 已迁移 |
-| CloudActivationScreen.kt | LoginView.swift | 已迁移 |
-| ReadScreen.kt (云端) | HomeworkListView.swift | 已迁移 |
-| AnswerActivity.kt | AnswerView.swift | 已迁移 |
-| SettingsScreen.kt | SettingsView.swift | 已迁移 |
-| ETS100FileReader.kt (本地) | — | 不可迁移 |
-| ShizukuManager.kt | — | 不可迁移 |
-| RootManager.kt | — | 不可迁移 |
-| ZWCHelper.kt (零宽字符) | — | 不可迁移 |
-
-## 构建指南
-
-### 前置条件
-
-- macOS 14+ / Xcode 16.0+
-- Apple Developer 账号（免费账号即可，用于签名调试）
-- ZIPFoundation 依赖（用于 ZIP 解压）
-
-### 安装依赖
-
-在 Xcode 中添加 SPM 依赖：
+## 三、目录结构
 
 ```
-https://github.com/weichsel/ZIPFoundation.git
+ETS100Tool/
+├── Package.swift                  # SwiftPM 清单（library product: ETS100Tool）
+├── xtool.yml                      # xtool 配置（bundleID）
+├── Sources/
+│   ├── CZlib/                     # zlib raw inflate 的 C 桥接
+│   │   ├── czlib.c
+│   │   └── include/czlib.h
+│   ├── ETS100Core/                # 平台无关核心层
+│   │   ├── ETSConfig.swift        # 端点、设备参数、状态常量
+│   │   ├── JSONValue.swift        # 有序 JSON + 紧凑序列化
+│   │   ├── MD5.swift              # 纯 Swift MD5
+│   │   ├── ETSError.swift         # 用户可读错误
+│   │   ├── Models.swift           # 账号 / 作业 / 试卷 / 题目
+│   │   ├── TextCleaning.swift     # HTML、实体、内部编号清洗
+│   │   ├── ContentParser.swift    # content.json → 题目
+│   │   ├── ZipPasswordGenerator.swift
+│   │   ├── ZipArchive.swift       # ZipCrypto + DEFLATE
+│   │   ├── AuthStore.swift        # 会话与机器码持久化
+│   │   ├── ETS100APIClient.swift  # 签名与全部 API
+│   │   └── CloudService.swift     # 登录 → 列表 → 下载 → 解密 → 缓存
+│   └── ETS100Tool/                # SwiftUI 应用层
+│       ├── ETS100ToolApp.swift    # @main
+│       ├── AppModel.swift         # 全局状态
+│       ├── Support/               # Keychain、环境装配、版本信息
+│       └── Views/                 # 登录 / 作业列表 / 答案 / 设置
+├── Tests/ETS100CoreTests/         # XCTest + 真实 content.json / 加密 ZIP 夹具
+└── .github/workflows/ci.yml
 ```
 
-File → Add Package Dependencies → 搜索 ZIPFoundation → 选择最新版本 → Add to Target "ETS100Tool"
+---
 
-### 构建设置
+## 四、构建
 
-- Target: ETS100Tool
-- Bundle ID: `com.nanshanqilin.ets`
-- Deployment Target: iOS 16.0
-- Scheme: Release
+### 4.1 前置条件
 
-### 编译
+- Swift 6.2 或更高（`swift --version` 可验证）
+- [xtool](https://github.com/xtool-org/xtool/releases) 1.24+
+- 任一方案：
+  - **macOS**：安装 Xcode 15+，xtool 可直接使用本机 SDK；
+  - **Linux / Windows**：准备 `Xcode.xip` 或 xtool 的 `darwin.xtoolsdk`，无需 Mac 图形界面。
 
-```
-xcodebuild -project ETS100Tool.xcodeproj \
-           -scheme ETS100Tool \
-           -configuration Release \
-           -destination 'generic/platform=iOS' \
-           archive -archivePath ./build/ETS100Tool.xcarchive
-```
+### 4.2 常用命令
 
-### 导出 .ipa
+```bash
+# 安装 Darwin SDK（首次需要，传入本机 Xcode.xip / Xcode.app / darwin.xtoolsdk）
+xtool sdk install /path/to/Xcode.xip
 
-```
-xcodebuild -exportArchive \
-           -archivePath ./build/ETS100Tool.xcarchive \
-           -exportPath ./build \
-           -exportOptionsPlist exportOptions.plist
-```
+# 调试构建并安装到已连接设备
+xtool dev
 
-`exportOptions.plist` 示例（Ad-hoc 分发）：
+# 只构建
+xtool dev build --configuration release
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>method</key>
-    <string>ad-hoc</string>
-    <key>teamID</key>
-    <string>YOUR_TEAM_ID</string>
-    <key>compileBitcode</key>
-    <false/>
-</dict>
-</plist>
+# 产出未签名 .ipa
+xtool dev build --configuration release --ipa
+
+# 生成 Xcode 工程（需要图形化调试时）
+xtool dev generate-xcode-project
 ```
 
-## .ipa 分发方案（不上架 App Store）
+`xtool.yml` 中已固定 `bundleID: com.nanshanqilin.ets`，与安卓版保持一致。
 
-| 方案 | 推荐度 | 说明 |
-|---|---|---|
-| **AltStore / SideStore** | 推荐 | 用户用个人 Apple ID 侧载，7 天自动续签，3 台设备上限 |
-| Ad-hoc 分发 | 中等 | 需开发者证书 + 用户 UDID，100 台，1 年有效期 |
-| 企业证书 | 高级 | 无设备限制，需企业开发者账号 ($299/年) |
+### 4.3 单元测试
 
-**推荐 AltStore**：安装 AltStore → 用个人 Apple ID 签名 → 侧载 .ipa，7 天自动续签。
+协议层与压缩层不依赖 Apple 平台，Linux 上即可跑通：
 
-## API 端点
+```bash
+swift test
+```
 
-| 端点 | 方法 | 说明 |
-|---|---|---|
-| `api.ets100.com/api/login` | POST | 账号密码登录 |
-| `api.ets100.com/api/device/bind` | POST | 设备绑定 |
-| `api.ets100.com/api/ecard/list` | GET | 获取父账户 ID |
-| `api.ets100.com/api/homework/list` | GET | 获取作业列表 |
-| `api.ets100.com/api/homework/detail` | GET | 获取作业详情 |
-| `cdn.subject.ets100.com/{resource}` | GET | 下载试卷 ZIP |
+测试覆盖：MD5 向量、JSON 紧凑序列化与签名、短信/登录参数、机器码格式、账号有效性、文本清洗、各 `structure_type` 解析、ZIP 密码派生、ZipCrypto 解密与 CRC 校验。
 
-所有签名使用公式：`MD5(PID + timestamp + bodyBase64 + SECRET_KEY)`
+---
 
-## 安全声明
+## 五、协议要点
 
-- SECRET_KEY 硬编码于客户端，仅供学习交流使用
-- 云端模式登录会导致 E听说官方客户端退出登录
-- 本应用**仅供学习交流使用，请勿用于考试作弊**
-- 使用本应用即表示您同意自行承担所有风险
+| 项目 | 值 / 规则 |
+|---|---|
+| API | `https://api.ets100.com` |
+| CDN | `https://cdn.subject.ets100.com`（客户端统一升级为 HTTPS） |
+| PID | `grlx` |
+| 签名 | `MD5(pid + timestamp + bodyBase64 + secret)` |
+| 请求体 | `[{"r": route, "params": {...}}]` 紧凑 JSON → Base64 |
+| 机器码 | `MD5(随机hex)[8..24] + "|" + MD5(随机hex)[8..24]`，首次生成后持久化 |
+| 登录 | `POST /user/login`（`version=3`、`device_name=DESKTOP`） |
+| 绑定 | `POST /user/rebind-code`（`version=2`、`device_name=1337`） |
+| 账号 | `POST /m/ecard/list` |
+| 作业 | `POST /g/homework/list`（`status=1/2/3`） |
+| ZIP 密码 | 尾部 336 字节，校验 `MSTCHINA` 或 `EPLAT`，seed 取 `[16,144)`，两次 MD5 大写拼接为 64 字符 |
 
-## License
+实现与安卓端逐字节对齐，相关常量集中在 [ETSConfig.swift](Sources/ETS100Core/ETSConfig.swift)。
 
-本项目仅用于学习和技术交流。不对任何因使用本项目产生的后果负责。
+---
+
+## 六、安全与隐私
+
+- token / 密码保存在 **Keychain**（`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`），不会写入普通文件。
+- 手机号、机器码、账号名称等非敏感信息保存在 UserDefaults，便于自动刷新登录。
+- 所有请求只发往 ETS100 官方域名，不上传任何第三方服务器。
+- iOS 端不关闭 TLS 校验（安卓端曾为 CDN 放宽校验）；如遇 CDN 证书异常会直接提示错误。
+- 机器码为随机生成的伪设备标识，不读取真实硬件信息。
+
+---
+
+## 七、持续集成
+
+[ci.yml](.github/workflows/ci.yml) 包含：
+
+1. **Linux 核心测试**：`swift test`，验证协议与压缩逻辑；
+2. **macOS SwiftUI 编译**：`swift build` + `swift test`，验证 SwiftUI 应用层；
+3. **iOS 打包检查**：下载 xtool，生成 Xcode 工程后用 `xcodebuild` 构建未签名 iOS 产物。
+
+签名与真机安装仍需自备 Apple 开发者账号（免费账号可用 AltStore / SideStore 侧载）。
+
+---
+
+## 八、License
+
+仅用于学习与技术交流。项目作者不对使用本项目造成的任何直接或间接后果负责。

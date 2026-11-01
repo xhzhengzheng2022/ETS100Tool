@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  core-linux:
+    name: Core tests (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install zlib headers
+        run: sudo apt-get update && sudo apt-get install -y zlib1g-dev
+
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.2"
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
+
+  app-macos:
+    name: SwiftUI type-check (macOS)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test

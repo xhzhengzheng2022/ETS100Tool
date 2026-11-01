@@ -1,0 +1,48 @@
+name: Build unsigned IPA
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  ipa:
+    name: xtool + xcodebuild (unsigned)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install xtool
+        run: |
+          curl -fsSL -o xtool.zip \
+            https://github.com/xtool-org/xtool/releases/download/1.24.0/xtool.app.zip
+          unzip -q xtool.zip
+          sudo xattr -dr com.apple.quarantine xtool.app || true
+          echo "$PWD/xtool.app/Contents/MacOS" >> "$GITHUB_PATH"
+
+      - name: Generate Xcode project
+        run: xtool dev generate-xcode-project
+
+      - name: Build unsigned app
+        run: |
+          xcodebuild \
+            -project ETS100Tool.xcodeproj \
+            -scheme ETS100Tool \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/*.app Payload/
+          zip -qry ETS100Tool-unsigned.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ETS100Tool-unsigned-ipa
+          path: ETS100Tool-unsigned.ipa
+          if-no-files-found: error
