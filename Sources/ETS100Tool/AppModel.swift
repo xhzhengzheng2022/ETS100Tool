@@ -44,13 +44,14 @@ final class AppModel: ObservableObject {
     private let service: ETS100CloudService
 
     init(
-        auth: ETS100AuthStore = SessionEnvironment.auth,
-        service: ETS100CloudService = SessionEnvironment.service
+        auth: ETS100AuthStore? = nil,
+        service: ETS100CloudService? = nil
     ) {
-        self.auth = auth
-        self.service = service
-        self.isSignedIn = auth.isLoggedIn
-        self.profile = auth.profile()
+        let resolvedAuth = auth ?? SessionEnvironment.auth
+        self.auth = resolvedAuth
+        self.service = service ?? SessionEnvironment.service
+        self.isSignedIn = resolvedAuth.isLoggedIn
+        self.profile = resolvedAuth.profile()
     }
 
     // MARK: - Session

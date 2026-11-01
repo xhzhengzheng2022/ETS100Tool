@@ -73,6 +73,15 @@ extension View {
     }
 
     @ViewBuilder
+    func smsCodeInputStyle() -> some View {
+        #if os(iOS)
+        self.keyboardType(.numberPad)
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
     func inlineNavigationTitle() -> some View {
         #if os(iOS)
         self.navigationBarTitleDisplayMode(.inline)

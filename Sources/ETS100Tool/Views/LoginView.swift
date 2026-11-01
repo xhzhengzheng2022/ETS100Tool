@@ -132,8 +132,8 @@ struct LoginView: View {
                 HStack(spacing: 10) {
                     TextField("短信验证码", text: $smsCode)
                         .textFieldStyle(.plain)
-                        .keyboardType(.numberPad)
                         .focused($focused, equals: .smsCode)
+                        .smsCodeInputStyle()
 
                     Button(model.smsSent ? "重新发送" : "发送验证码") {
                         Task { await model.sendSMS(phone: phone) }
