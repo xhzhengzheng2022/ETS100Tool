@@ -77,7 +77,7 @@ struct HomeworkListView: View {
                         .font(.caption)
                 }
             }
-            .listStyle(.insetGrouped)
+            .groupedListStyle()
             .refreshable {
                 await model.load(status: model.selectedStatus, force: true)
             }

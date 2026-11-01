@@ -98,6 +98,16 @@ extension View {
         self
         #endif
     }
+
+    /// `insetGrouped` 仅在 iOS 可用，macOS 回退到 `inset`。
+    @ViewBuilder
+    func groupedListStyle() -> some View {
+        #if os(iOS)
+        self.listStyle(.insetGrouped)
+        #else
+        self.listStyle(.inset)
+        #endif
+    }
 }
 
 enum Clipboard {

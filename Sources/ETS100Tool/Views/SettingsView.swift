@@ -15,7 +15,7 @@ struct SettingsView: View {
                 aboutSection
                 disclaimerSection
             }
-            .listStyle(.insetGrouped)
+            .groupedListStyle()
             .navigationTitle("设置")
             .confirmationDialog("确定退出当前账号？", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
                 Button("退出登录", role: .destructive) {
