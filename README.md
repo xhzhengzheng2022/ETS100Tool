@@ -148,11 +148,16 @@ swift test
 
 ## 七、持续集成
 
-[ci.yml](.github/workflows/ci.yml) 包含：
+| 工作流 | 触发 | 内容 |
+|---|---|---|
+| [ci.yml](.github/workflows/ci.yml) | push / PR | Linux `swift build` + `swift test`；macOS `swift build` + `swift test`（SwiftUI 类型检查） |
+| [ios-build.yml](.github/workflows/ios-build.yml) | 手动 / tag | `xcodebuild` 直编 SwiftPM 包，验证 iOS 目标可编译（必过项）；可选勾选后用 xtool 生成工程并打包未签名 IPA |
 
-1. **Linux 核心测试**：`swift test`，验证协议与压缩逻辑；
-2. **macOS SwiftUI 编译**：`swift build` + `swift test`，验证 SwiftUI 应用层；
-3. **iOS 打包检查**：下载 xtool，生成 Xcode 工程后用 `xcodebuild` 构建未签名 iOS 产物。
+xtool 打包任务默认可选，原因是在无图形会话的 CI 里 `xtool` CLI 可能长时间阻塞（实测 `xtool --version` 超过 120 秒无输出）。请在本地或在具备 Darwin SDK 的机器上执行：
+
+```bash
+xtool dev build --configuration release --ipa
+```
 
 签名与真机安装仍需自备 Apple 开发者账号（免费账号可用 AltStore / SideStore 侧载）。
 
