@@ -97,7 +97,7 @@ final class CDNTrustDelegate: NSObject, URLSessionDelegate {
         }
         var names: [String] = []
         if let summary = SecCertificateCopySubjectSummary(leaf) {
-            names.append(summary)
+            names.append("\(summary)")
         }
         if let values = SecCertificateCopyValues(
             leaf,
