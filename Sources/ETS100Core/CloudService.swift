@@ -22,12 +22,8 @@ public actor ETS100CloudService {
         self.auth = auth
         self.api = api
         self.fileManager = fileManager
-        self.session = URLSession(configuration: {
-            let configuration = URLSessionConfiguration.default
-            configuration.timeoutIntervalForRequest = ETSConfig.requestTimeout
-            configuration.timeoutIntervalForResource = 300
-            return configuration
-        }())
+        // CDN 证书实际签发给了 `default.chinanetcenter.com`，需要放宽主机名匹配。
+        self.session = CDNTrustPolicy.makeSession()
 
         let base = cacheRoot ?? {
             let support = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
@@ -326,6 +322,20 @@ public actor ETS100CloudService {
 
     // MARK: - Networking
 
+    static func isCertificateError(_ error: URLError) -> Bool {
+        switch error.code {
+        case .secureConnectionFailed,
+             .serverCertificateUntrusted,
+             .serverCertificateHasBadDate,
+             .serverCertificateNotYetValid,
+             .serverCertificateHasUnknownRoot,
+             .clientCertificateRejected:
+            return true
+        default:
+            return false
+        }
+    }
+
     private func download(url: URL) async throws -> Data {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -338,6 +348,8 @@ public actor ETS100CloudService {
         let response: URLResponse
         do {
             (data, response) = try await session.data(for: request)
+        } catch let error as URLError where Self.isCertificateError(error) {
+            throw ETSError.network("CDN 安全连接失败（上游证书域名不匹配）")
         } catch {
             throw ETSError.network(error.localizedDescription)
         }
