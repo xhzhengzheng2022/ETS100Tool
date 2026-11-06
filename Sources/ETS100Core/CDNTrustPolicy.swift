@@ -99,16 +99,27 @@ final class CDNTrustDelegate: NSObject, URLSessionDelegate {
         if let summary = SecCertificateCopySubjectSummary(leaf) {
             names.append(summary)
         }
-        if let values = SecCertificateCopyValues(leaf, [kSecOIDSubjectAltName] as CFArray, nil) as? [String: Any],
-           let entry = values[kSecOIDSubjectAltName as String] as? [String: Any],
-           let list = entry[kSecOIDPropertyValue as String] as? [[String: Any]] {
-            for item in list {
-                if let value = item[kSecOIDPropertyValue as String] as? String {
-                    names.append(value)
-                }
-            }
+        if let values = SecCertificateCopyValues(
+            leaf,
+            [kSecOIDSubjectAltName as String] as CFArray,
+            nil
+        ) as? [String: Any] {
+            names.append(contentsOf: stringValues(in: values))
         }
         return names
+    }
+
+    private static func stringValues(in value: Any) -> [String] {
+        switch value {
+        case let text as String:
+            return [text]
+        case let array as [Any]:
+            return array.flatMap { stringValues(in: $0) }
+        case let object as [String: Any]:
+            return object.values.flatMap { stringValues(in: $0) }
+        default:
+            return []
+        }
     }
 }
 
