@@ -141,7 +141,7 @@ swift test
 - token / 密码保存在 **Keychain**（`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`），不会写入普通文件。
 - 手机号、机器码、账号名称等非敏感信息保存在 UserDefaults，便于自动刷新登录。
 - 所有请求只发往 ETS100 官方域名，不上传任何第三方服务器。
-- CDN 下载采用**限定范围放宽**：上游证书实际签发给 `default.chinanetcenter.com`，与 CDN 主机名不匹配。`CDNTrustPolicy` 只作用于 CDN 下载会话（`api.ets100.com` 的 API 会话不受影响），以证书链与有效期为主：链校验通过即放行；链校验失败时，仅当主机或证书域名命中 `ets100.com` / `chinanetcenter.com` 允许列表才放行。
+- CDN 下载采用**隔离范围放宽**：上游证书实际签发给 `default.chinanetcenter.com`，与 CDN 主机名不匹配，iOS 默认信任评估必然失败。`CDNTrustPolicy` 为此单独创建下载会话并接受其服务器证书（对齐安卓端 `ETS100ApiDownload` 的做法）；该会话不携带账号凭据，`api.ets100.com` 的 API 会话仍由系统严格校验。CI 中有联网用例验证 CDN 证书可被接受。
 - 机器码为随机生成的伪设备标识，不读取真实硬件信息。
 
 ---
