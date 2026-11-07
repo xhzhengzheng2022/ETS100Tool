@@ -39,7 +39,7 @@ jobs:
   # 因此该任务默认不执行，仅在手动触发并勾选时运行。
   unsigned-ipa:
     name: xtool unsigned IPA
-    if: github.event_name == 'push' || inputs.xtool_ipa
+    if: github.event_name == 'workflow_dispatch' && inputs.xtool_ipa
     runs-on: macos-15
     timeout-minutes: 40
     steps:
@@ -55,7 +55,15 @@ jobs:
 
       - name: Check xtool CLI
         run: |
-          python3 -c "import subprocess,sys; sys.exit(subprocess.run(['xtool','--version'], timeout=120).returncode)"
+          python3 - <<'PY'
+          import subprocess, sys
+          try:
+              result = subprocess.run(["xtool", "--version"], timeout=120)
+          except subprocess.TimeoutExpired:
+              print("xtool CLI 无响应，跳过后续 IPA 步骤")
+              sys.exit(1)
+          sys.exit(result.returncode)
+          PY
 
       - name: Generate Xcode project
         run: |

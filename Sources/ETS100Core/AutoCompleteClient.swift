@@ -17,37 +17,37 @@ public final class AutoCompleteClient: @unchecked Sendable {
 
     // MARK: - Official endpoints
 
-    public func checkStart(homeworkID: String, token: String) async throws -> [String: Any] {
+    public func checkStart(homeworkID: String, token: String) async throws -> JSONPayload {
         var params = common(token: token)
         params["homework_id"] = .int(Int(homeworkID) ?? 0)
         return try await call("g/homework/checkstart", params)
     }
 
-    public func pprResources(batch: [JSONObject], token: String) async throws -> [String: Any] {
+    public func pprResources(batch: [JSONObject], token: String) async throws -> JSONPayload {
         var params = common(token: token)
         params["batch"] = .array(batch.map { .object($0) })
         return try await call("g/set/ppr-res", params)
     }
 
-    public func preUpload(token: String) async throws -> [String: Any] {
+    public func preUpload(token: String) async throws -> JSONPayload {
         try await call("m/file/pre-upload", common(token: token))
     }
 
-    public func ossConfig(type: String, id: String, token: String) async throws -> [String: Any] {
+    public func ossConfig(type: String, id: String, token: String) async throws -> JSONPayload {
         var params = common(token: token)
         params["type"] = .string(type)
         params["id"] = .string(id)
         return try await call("system/oss-config", params)
     }
 
-    public func syncQuestion(_ parameters: JSONObject, token: String) async throws -> [String: Any] {
+    public func syncQuestion(_ parameters: JSONObject, token: String) async throws -> JSONPayload {
         var params = common(token: token)
         params.merge(parameters)
         params["parent_account_id"] = nil
         return try await call("m/audio/sync-v2", params)
     }
 
-    public func setUseTime(_ parameters: JSONObject, token: String) async throws -> [String: Any] {
+    public func setUseTime(_ parameters: JSONObject, token: String) async throws -> JSONPayload {
         var params = common(token: token)
         params.merge(parameters)
         params["parent_account_id"] = nil
@@ -58,7 +58,7 @@ public final class AutoCompleteClient: @unchecked Sendable {
         _ parameters: JSONObject,
         parentAccountID: String,
         token: String
-    ) async throws -> [String: Any] {
+    ) async throws -> JSONPayload {
         var params = common(token: token)
         params.merge(parameters)
         if params["parent_account_id"] == nil, !parentAccountID.isEmpty {
@@ -67,13 +67,13 @@ public final class AutoCompleteClient: @unchecked Sendable {
         return try await call("g/homework/report-score", params)
     }
 
-    public func submitHomework(_ parameters: JSONObject, token: String) async throws -> [String: Any] {
+    public func submitHomework(_ parameters: JSONObject, token: String) async throws -> JSONPayload {
         var params = common(token: token)
         params.merge(parameters)
         return try await call("m/homework/submit", params)
     }
 
-    public func scoreDrop(homeworkID: String, token: String) async throws -> [String: Any] {
+    public func scoreDrop(homeworkID: String, token: String) async throws -> JSONPayload {
         var params = common(token: token)
         params["homework_id"] = JSONValue.intOrString(homeworkID)
         params["resource_id"] = .string("")
@@ -86,7 +86,7 @@ public final class AutoCompleteClient: @unchecked Sendable {
         resourceID: String,
         parentAccountID: String,
         token: String
-    ) async throws -> [String: Any] {
+    ) async throws -> JSONPayload {
         var params = common(token: token)
         params["homework_id"] = .string(homeworkID)
         params["resource_id"] = .string(resourceID)
@@ -180,14 +180,27 @@ public final class AutoCompleteClient: @unchecked Sendable {
         ])
     }
 
-    private func call(_ route: String, _ params: JSONObject) async throws -> [String: Any] {
+    private func call(_ route: String, _ params: JSONObject) async throws -> JSONPayload {
         let response = try await api.post(route: route, params: params)
         let code = JSONReader.optionalInt(response["code"]) ?? 0
         if code != 0 {
             throw ETSError.server(code: code, message: JSONReader.string(response["msg"]))
         }
-        return (try? api.bodyObject(response)) ?? [:]
+        return JSONPayload((try? api.bodyObject(response)) ?? [:])
     }
+}
+
+/// Sendable wrapper for the untyped JSON dictionary returned by the gateway.
+/// The values only ever originate from `JSONSerialization` and are copied
+/// before leaving the networking layer.
+public struct JSONPayload: @unchecked Sendable {
+    public let raw: [String: Any]
+
+    public init(_ raw: [String: Any] = [:]) {
+        self.raw = raw
+    }
+
+    public subscript(key: String) -> Any? { raw[key] }
 }
 
 // MARK: - Untyped JSON bridging

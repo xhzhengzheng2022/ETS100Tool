@@ -95,7 +95,7 @@ public actor AutoCompleteEngine {
             let body = try await perform { [client] token in
                 try await client.pprResources(batch: batch, token: token)
             }
-            pprGroups = Self.parsePPR(body)
+            pprGroups = Self.parsePPR(body.raw)
         } catch let error as ETSError {
             if Self.isTokenExpired(error) { throw error }
             pprGroups = [:]
@@ -304,7 +304,7 @@ public actor AutoCompleteEngine {
         try? await Task.sleep(nanoseconds: 500_000_000)
         var officialPoint: Double?
         var verified = false
-        if let info = try? await perform({ [client, parentAccountID] token in
+        if let info = try? await perform({ [client, parentAccountID, homeworkID, resourceID] token in
             try await client.homeworkInfo(
                 homeworkID: homeworkID,
                 resourceID: resourceID,
@@ -601,7 +601,7 @@ public actor AutoCompleteEngine {
 
     // MARK: - Session helpers
 
-    private func perform<T>(_ operation: (String) async throws -> T) async throws -> T {
+    private func perform<T: Sendable>(_ operation: @Sendable (String) async throws -> T) async throws -> T {
         do {
             return try await operation(token)
         } catch let error as ETSError where Self.isTokenExpired(error) {
