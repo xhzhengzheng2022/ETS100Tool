@@ -60,6 +60,18 @@ public enum CDNTrustPolicy {
         return URLSession(configuration: configuration())
         #endif
     }
+
+    /// 是否放行服务器信任。
+    ///
+    /// - `chainValid`：证书链与有效期通过系统校验（忽略主机名）。
+    /// - `recognized`：主机或证书域名命中允许列表。
+    ///
+    /// 上游 CDN 的证书域名与主机不匹配，因此以证书链本身为主：
+    /// 链合法即放行；链校验失败时，只要主机或证书域名在允许列表内也放行，
+    /// 以对齐安卓端的行为。
+    public static func shouldAcceptServerTrust(chainValid: Bool, recognized: Bool) -> Bool {
+        chainValid || recognized
+    }
 }
 
 #if canImport(Security)
@@ -72,10 +84,15 @@ final class CDNTrustDelegate: NSObject, URLSessionDelegate {
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
         guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-              let trust = challenge.protectionSpace.serverTrust,
-              CDNTrustPolicy.isTrustedHost(challenge.protectionSpace.host),
-              Self.hasValidChain(trust),
-              Self.certificateNames(of: trust).contains(where: CDNTrustPolicy.matchesAllowedName) else {
+              let trust = challenge.protectionSpace.serverTrust else {
+            completionHandler(.performDefaultHandling, nil)
+            return
+        }
+        let host = challenge.protectionSpace.host
+        let chainValid = Self.hasValidChain(trust)
+        let recognized = CDNTrustPolicy.isTrustedHost(host)
+            || Self.certificateNames(of: trust).contains(where: CDNTrustPolicy.matchesAllowedName)
+        guard CDNTrustPolicy.shouldAcceptServerTrust(chainValid: chainValid, recognized: recognized) else {
             completionHandler(.performDefaultHandling, nil)
             return
         }

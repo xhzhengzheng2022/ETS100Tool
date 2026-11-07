@@ -14,7 +14,7 @@ public enum ETSConfig {
     public static let requestTimeout: TimeInterval = 30
     public static let archiveFooterSize = 336
 
-    public static let appVersion = "2.0.1"
+    public static let appVersion = "2.0.2"
     public static let bundleID = "com.nanshanqilin.ets"
 
     public static let statusCurrent = "1"

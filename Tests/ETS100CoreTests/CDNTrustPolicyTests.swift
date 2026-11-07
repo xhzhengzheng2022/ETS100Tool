@@ -29,6 +29,13 @@ final class CDNTrustPolicyTests: XCTestCase {
         XCTAssertEqual(configuration.timeoutIntervalForResource, 300)
     }
 
+    func testServerTrustDecision() {
+        XCTAssertTrue(CDNTrustPolicy.shouldAcceptServerTrust(chainValid: true, recognized: true))
+        XCTAssertTrue(CDNTrustPolicy.shouldAcceptServerTrust(chainValid: true, recognized: false))
+        XCTAssertTrue(CDNTrustPolicy.shouldAcceptServerTrust(chainValid: false, recognized: true))
+        XCTAssertFalse(CDNTrustPolicy.shouldAcceptServerTrust(chainValid: false, recognized: false))
+    }
+
     func testCertificateErrorClassification() {
         XCTAssertTrue(ETS100CloudService.isCertificateError(URLError(.secureConnectionFailed)))
         XCTAssertTrue(ETS100CloudService.isCertificateError(URLError(.serverCertificateUntrusted)))

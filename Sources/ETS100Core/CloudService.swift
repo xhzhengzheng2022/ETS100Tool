@@ -349,7 +349,7 @@ public actor ETS100CloudService {
         do {
             (data, response) = try await session.data(for: request)
         } catch let error as URLError where Self.isCertificateError(error) {
-            throw ETSError.network("CDN 安全连接失败（上游证书域名不匹配）")
+            throw ETSError.network("CDN 安全连接失败（上游证书域名不匹配，主机 \(url.host ?? "未知")）")
         } catch {
             throw ETSError.network(error.localizedDescription)
         }
