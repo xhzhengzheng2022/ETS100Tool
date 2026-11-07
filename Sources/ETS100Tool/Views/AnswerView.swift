@@ -7,6 +7,7 @@ struct AnswerView: View {
 
     @EnvironmentObject private var model: AppModel
     @State private var copiedQuestionID: String?
+    @State private var showAutoComplete = false
 
     private var paper: Paper? {
         model.paper(for: route.homework.id)
@@ -34,6 +35,12 @@ struct AnswerView: View {
                         Image(systemName: "square.and.arrow.up")
                     }
                 }
+            }
+        }
+        .sheet(isPresented: $showAutoComplete) {
+            if let paper {
+                AutoCompleteView(route: route, paper: paper)
+                    .environmentObject(model)
             }
         }
         .task {
@@ -76,6 +83,16 @@ struct AnswerView: View {
                     tag("满分 \(scoreText(total))", systemImage: "checkmark.seal")
                 }
             }
+
+            Button {
+                showAutoComplete = true
+            } label: {
+                Label("一键完成", systemImage: "wand.and.stars")
+                    .font(.footnote.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(route.homework.needsOnlineFetch)
 
             HStack(spacing: 10) {
                 Button {

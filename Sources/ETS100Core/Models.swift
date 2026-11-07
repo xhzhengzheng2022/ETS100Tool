@@ -128,6 +128,10 @@ public struct HomeworkItem: Codable, Hashable, Identifiable, Sendable {
     public var point: Double?
     public var useTime: Int
     public var status: String
+    /// Official `struct.set_id`, used by the auto-complete report payload.
+    public var setID: String?
+    /// Official `struct.total_point` when the server provides it.
+    public var structTotalPoint: Double?
 
     public init(
         id: String,
@@ -139,7 +143,9 @@ public struct HomeworkItem: Codable, Hashable, Identifiable, Sendable {
         totalScore: Double = 0,
         point: Double? = nil,
         useTime: Int = 0,
-        status: String = ""
+        status: String = "",
+        setID: String? = nil,
+        structTotalPoint: Double? = nil
     ) {
         self.id = id
         self.name = name
@@ -151,6 +157,8 @@ public struct HomeworkItem: Codable, Hashable, Identifiable, Sendable {
         self.point = point
         self.useTime = useTime
         self.status = status
+        self.setID = setID
+        self.structTotalPoint = structTotalPoint
     }
 
     /// Online PK / vocabulary homework has no ZIP packages.

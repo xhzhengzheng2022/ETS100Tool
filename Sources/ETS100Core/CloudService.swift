@@ -300,6 +300,33 @@ public actor ETS100CloudService {
         }
     }
 
+    // MARK: - Auto complete
+
+    /// Runs the local auto-complete pipeline for a parsed homework.
+    public func autoComplete(
+        homework: HomeworkItem,
+        paper: Paper,
+        options: AutoCompleteOptions,
+        onProgress: @escaping @Sendable (AutoCompleteProgress) -> Void
+    ) async throws -> AutoCompleteResult {
+        let token = try await freshToken()
+        guard let parentAccountID = auth.parentAccountID else {
+            throw ETSError.notLoggedIn
+        }
+        let engine = AutoCompleteEngine(
+            api: api,
+            token: token,
+            parentAccountID: parentAccountID,
+            relogin: { try await self.refreshSession() }
+        )
+        return try await engine.run(
+            homework: homework,
+            paper: paper,
+            options: options,
+            onProgress: onProgress
+        )
+    }
+
     // MARK: - Cache helpers
 
     private func homeworkCacheDirectory(homeworkID: String) -> URL {

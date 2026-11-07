@@ -4,7 +4,7 @@ import Foundation
 /// serialization. The ETS100 signature is computed over the exact bytes of the
 /// encoded body, so Foundation's `JSONSerialization` (which may reorder keys and
 /// add whitespace) cannot be used for outgoing payloads.
-public enum JSONValue {
+public enum JSONValue: Sendable {
     case string(String)
     case int(Int)
     case double(Double)
@@ -14,11 +14,19 @@ public enum JSONValue {
     case object(JSONObject)
 }
 
-public struct JSONObject {
+public struct JSONObject: Sendable {
     public var pairs: [(key: String, value: JSONValue)]
 
     public init(_ pairs: [(String, JSONValue)] = []) {
         self.pairs = pairs
+    }
+
+    public init(anyValues: [String: Any]) {
+        var object = JSONObject()
+        for key in anyValues.keys.sorted() {
+            object[key] = JSONValue.from(anyValues[key]!)
+        }
+        self = object
     }
 
     public subscript(key: String) -> JSONValue? {

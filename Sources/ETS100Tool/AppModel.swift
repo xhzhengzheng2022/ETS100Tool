@@ -256,6 +256,24 @@ final class AppModel: ObservableObject {
         await loadPaper(for: route)
     }
 
+    // MARK: - Auto complete
+
+    func autoComplete(
+        route: HomeworkRoute,
+        options: AutoCompleteOptions,
+        onProgress: @escaping @Sendable (AutoCompleteProgress) -> Void
+    ) async throws -> AutoCompleteResult {
+        guard let paper = papers[route.homework.id] else {
+            throw ETSError.parsingFailed("请先加载作业内容")
+        }
+        return try await service.autoComplete(
+            homework: route.homework,
+            paper: paper,
+            options: options,
+            onProgress: onProgress
+        )
+    }
+
     // MARK: - Cache
 
     func clearCache() async {

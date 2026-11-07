@@ -17,9 +17,11 @@ ETS100 云端答案读取工具的 iOS 实现。以安卓版 Kotlin / Jetpack Co
 | `content.json` 题目与答案解析 | ✅ | 支持 choose / fill / picture / read / role / dialogue / 3q5a 等 |
 | 解析结果本地缓存 | ✅ | Application Support 下的 `cloud_homework/` 与 `papers/` |
 | 答案复制 / 分享 | ✅ | 单题、整卷均可复制与系统分享 |
+| 一键完成（本地自动提交） | ✅ | 迁移自 `lastudio_backend/auto_complete`，静音音频占位，不依赖第三方服务 |
 | 本地读取（Root / Shizuku / 零宽字符） | ❌ | iOS 沙盒限制，无法实现 |
 | 词汇 PK 等在线作业 | ❌ | 在线题目协议未移植，列表会给出提示 |
-| 自动答题 / 自动提交 | ❌ | 本项目只读，不包含任何写操作 |
+
+> 「一键完成」会向 ETS100 官方接口提交作答，属于**写操作**，提交后作业状态不可撤销。入口位于答案页，默认目标满分，可在提交前调整目标比例与作答时长。
 
 ---
 
@@ -61,12 +63,16 @@ ETS100Tool/
 │   │   ├── ZipArchive.swift       # ZipCrypto + DEFLATE
 │   │   ├── AuthStore.swift        # 会话与机器码持久化
 │   │   ├── ETS100APIClient.swift  # 签名与全部 API
+│   │   ├── AutoCompleteModels.swift   # 一键完成选项 / 进度 / 结果
+│   │   ├── AutoCompleteScoring.swift  # ISE 评分、score_detail、XML、官方单位换算
+│   │   ├── AutoCompleteClient.swift   # checkstart / ppr-res / OSS / sync-v2 等
+│   │   ├── AutoCompleteEngine.swift   # 逐题上传 → 同步 → 上报 → 提交 → 回读
 │   │   └── CloudService.swift     # 登录 → 列表 → 下载 → 解密 → 缓存
 │   └── ETS100Tool/                # SwiftUI 应用层
 │       ├── ETS100ToolApp.swift    # @main
 │       ├── AppModel.swift         # 全局状态
 │       ├── Support/               # Keychain、环境装配、版本信息
-│       └── Views/                 # 登录 / 作业列表 / 答案 / 设置
+│       └── Views/                 # 登录 / 作业列表 / 答案 / 一键完成 / 设置
 ├── Tests/ETS100CoreTests/         # XCTest + 真实 content.json / 加密 ZIP 夹具
 └── .github/workflows/ci.yml
 ```
@@ -112,7 +118,7 @@ xtool dev generate-xcode-project
 swift test
 ```
 
-测试覆盖：MD5 向量、JSON 紧凑序列化与签名、短信/登录参数、机器码格式、账号有效性、文本清洗、各 `structure_type` 解析、ZIP 密码派生、ZipCrypto 解密与 CRC 校验。
+测试覆盖：MD5 向量、JSON 紧凑序列化与签名、短信/登录参数、机器码格式、账号有效性、文本清洗、各 `structure_type` 解析、ZIP 密码派生、ZipCrypto 解密与 CRC 校验，以及一键完成的分数换算、`score_detail`、ISE XML、音素切分与官方单位换算。
 
 ---
 
@@ -132,6 +138,23 @@ swift test
 | 作业 | `POST /g/homework/list`（`status=1/2/3`） |
 | ZIP 密码 | 尾部 336 字节，校验 `MSTCHINA` 或 `EPLAT`，seed 取 `[16,144)`，两次 MD5 大写拼接为 64 字符 |
 
+### 一键完成接口链路
+
+| 步骤 | 路由 | 说明 |
+|---|---|---|
+| 1 | `g/homework/checkstart` | 开始作答，返回官方 `resource_id` |
+| 2 | `g/homework/score-drop` | 重新提交前清除旧分数（尽力而为） |
+| 3 | `g/set/ppr-res` | 初始化题目资源，读取每题的 `entityId` / `order` / `maxScore` |
+| 4 | `m/file/pre-upload` + `system/oss-config` | 申请文件 ID 与 OSS 上传凭据 |
+| 5 | OSS multipart | 上传静音 MP3（36 字节占位）与 ISE 评分 XML |
+| 6 | `m/audio/sync-v2` | 逐题同步作答、时长与 `score_detail` |
+| 7 | `m/homework/set-use-time` | 写入累计作答时长 |
+| 8 | `g/homework/report-score` | 上报分数（含 `parent_account_id`） |
+| 9 | `m/homework/submit` | 提交作业 |
+| 10 | `m/homework/info` | 回读官方分数并核对 |
+
+评分换算：`ceil((目标 ISE 分 × 题目满分 / 5) / 0.125) × 0.125`，最终分数按 `round(score / 满分 × 1e6)` 上报。题目顺序与 `entity_id` 直接来自 `g/set/ppr-res`，避免依赖本地解析顺序。
+
 实现与安卓端逐字节对齐，相关常量集中在 [ETSConfig.swift](Sources/ETS100Core/ETSConfig.swift)。
 
 ---
@@ -140,7 +163,7 @@ swift test
 
 - token / 密码保存在 **Keychain**（`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`），不会写入普通文件。
 - 手机号、机器码、账号名称等非敏感信息保存在 UserDefaults，便于自动刷新登录。
-- 所有请求只发往 ETS100 官方域名，不上传任何第三方服务器。
+- 所有请求只发往 ETS100 官方域名（API、CDN、阿里云 OSS），不上传任何第三方服务器；一键完成不接入 `lastudio_backend`，也不需要 LastStudio 账号。
 - CDN 下载采用**隔离范围放宽**：上游证书实际签发给 `default.chinanetcenter.com`，与 CDN 主机名不匹配，iOS 默认信任评估必然失败。`CDNTrustPolicy` 为此单独创建下载会话并接受其服务器证书（对齐安卓端 `ETS100ApiDownload` 的做法）；该会话不携带账号凭据，`api.ets100.com` 的 API 会话仍由系统严格校验。CI 中有联网用例验证 CDN 证书可被接受。
 - 机器码为随机生成的伪设备标识，不读取真实硬件信息。
 

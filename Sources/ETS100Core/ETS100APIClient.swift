@@ -246,11 +246,15 @@ public final class ETS100APIClient: @unchecked Sendable {
                 contents: contents,
                 setType: JSONReader.int(row["set_type"]),
                 pk: JSONReader.int(row["pk"]),
-                resourceID: JSONReader.string(row["resource_id"]),
-                totalScore: JSONReader.double(row["total_score"]),
+                resourceID: JSONReader.string(row["resource_id"])
+                    .ifEmpty(JSONReader.string(row["res_id"]))
+                    .ifEmpty(JSONReader.string(row["resId"])),
+                totalScore: JSONReader.optionalDouble(row["total_score"] ?? row["score_total_point"]) ?? 0,
                 point: point,
-                useTime: JSONReader.int(row["use_time"]),
-                status: JSONReader.string(row["status"]).ifEmpty(status)
+                useTime: JSONReader.int(row["use_time"] ?? structObject?["use_time"]),
+                status: JSONReader.string(row["status"]).ifEmpty(status),
+                setID: JSONReader.optionalString(structObject?["set_id"]),
+                structTotalPoint: JSONReader.optionalDouble(structObject?["total_point"])
             )
         }
         return HomeworkList(baseURL: baseURL, homeworks: homeworks)
@@ -285,7 +289,7 @@ public final class ETS100APIClient: @unchecked Sendable {
         return envelope.compactJSON
     }
 
-    private func post(route: String, params: JSONObject) async throws -> [String: Any] {
+    func post(route: String, params: JSONObject) async throws -> [String: Any] {
         guard let url = URL(string: ETSConfig.apiBaseURL.absoluteString + "/" + route) else {
             throw ETSError.invalidResponse
         }
@@ -330,7 +334,7 @@ public final class ETS100APIClient: @unchecked Sendable {
         throw ETSError.invalidResponse
     }
 
-    private func bodyObject(_ response: [String: Any]) throws -> [String: Any] {
+    func bodyObject(_ response: [String: Any]) throws -> [String: Any] {
         if let body = response["body"] as? [String: Any] {
             return body
         }
